@@ -1,0 +1,183 @@
+version: '3.5'
+
+services:
+  jenkins:
+    image: jenkins-atf:1.5
+    build: jenkins/
+    container_name: jenkins
+    privileged: true
+    user: root
+    ports:
+      - 8080:8080
+      - 8443:8443
+      - 50000:50000
+    environment:
+      - JAVA_OPTS="-Djava.awt.headless=true -Dmail.smtp.starttls.enable=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - jenkins-home:/var/jenkins_home
+      - jenkins-maven-repo:/root/.m2
+      - /opt/app/infra/assets:/opt/infra-assets
+      - /opt/app/EOL_Synthetic_ATFReports:/opt/app/EOL_Synthetic_ATFReports
+    dns:
+      - 8.8.8.8
+    external_links:
+      - selenium-hub:selenium-hub
+    extra_hosts:
+      - cf-aws-ldap-slv01.celfocus.intra:10.235.12.119
+      - cf-aws-ldap-slv01:10.235.12.119
+      - cf-az-ldap-slv01.celfocus.intra:10.254.2.103
+      - cf-az-ldap-slv01:10.254.2.103
+      - cf-ovh-ldap-slv01.celfocus.intra:10.235.0.11
+      - cf-ovh-ldap-slv01:10.235.0.11
+    networks:
+      - infra-net
+  nexus:
+    image: sonatype/nexus3:3.27.0
+    container_name: nexus
+    volumes:
+      - nexus-data:/nexus-data
+    ports:
+      - 8081:8081
+      - 8085:8085
+    networks:
+      - infra-net
+  sonarqube:
+    image: sonarqube:8.9.6-community
+    container_name: sonarqube
+    depends_on:
+      - sonarqube-db
+    ports:
+      - 9000:9000
+    environment:
+      - sonar.jdbc.url=jdbc:postgresql://sonarqube-db:5432/sonar
+      - sonar.jdbc.username=sonar
+      - sonar.jdbc.password=sonar
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    networks:
+      - infra-net
+  sonarqube-db:
+    image: postgres:12.6-alpine
+    container_name: sonarqube-db
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - infra-net
+  sandbox-web:
+    image: sandbox-web:1.0
+    container_name: sandbox-web
+    build: sandbox_web/
+    ports:
+      - 127.0.0.1:3000:3000
+    networks:
+      - infra-net
+  sandbox-react:
+    image: sandbox-react:1.0
+    container_name: sandbox-react
+    build: sandbox_react/
+    ports:
+      - 3001:3001
+    networks:
+      - infra-net
+    extra_hosts:
+      - sandbox-react:127.0.0.1
+  sandbox-rest-api:
+    image: sandbox-rest-api:1.0
+    container_name: sandbox-rest-api
+    build: sandbox_rest_api/
+    ports:
+      - 5000:5000
+    networks:
+      - infra-net
+  sandbox-database:
+    image: sandbox-database:1.0
+    entrypoint: ['docker-entrypoint.sh', '--default-authentication-plugin=mysql_native_password']
+    container_name: sandbox-database
+    build: sandbox_database/
+    volumes:
+      - sandbox-database-data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    networks:
+      - infra-net
+  sandbox-proxy:
+    image: ubuntu:bionic-20200526
+    container_name: sandbox-proxy
+    build:
+        context: sandbox_proxy/
+    volumes: 
+        - proxy-log:/var/log/squid
+        - ./sandbox_proxy/squid.conf:/etc/squid/squid.conf
+    networks:
+      - infra-net
+  netdata:
+    image: netdata/netdata:v1.29.3
+    container_name: netdata
+    hostname: atf-box
+    ports:
+      - 19999:19999
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+  prometheus:
+    image: prom/prometheus:v2.25.0
+    container_name: prometheus
+    volumes:
+      - /opt/app/infra/qa-infra-atf-box/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - 9090:9090
+  grafana:
+    image: grafana/grafana:7.4.3
+    container_name: grafana
+    ports:
+      - 3200:3000
+volumes:
+  jenkins-maven-repo:
+    name: jenkins-maven-repo
+  jenkins-home:
+    name: jenkins-home
+  nexus-data:
+    name: nexus-data
+  sandbox-database-data:
+    name: sandbox-database-data
+  sonarqube-data:
+    name: sonarqube-data
+  sonarqube-extensions:
+    name: sonarqube-extensions
+  sonarqube-logs:
+    name: sonarqube-logs
+  postgresql_data:
+    name: postgresql_data
+  proxy-log:
+    name: proxy-log
+  netdataconfig:
+    name: netdataconfig
+  netdatalib:
+    name: netdatalib
+  netdatacache:
+    name: netdatacache
+networks:
+  infra-net:
+    name: infra-net
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.2.0/24

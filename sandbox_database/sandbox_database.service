@@ -1,0 +1,14 @@
+[Unit]
+Description=sandbox database service with docker compose
+Requires=docker.service
+After=docker.service
+
+[Service]
+Restart=always
+WorkingDirectory=/opt/app/infra/qa-infra-atf-box
+
+ExecStart=/bin/docker-compose up --build sandbox-database
+ExecStop=/bin/docker-compose rm -f -s -v sandbox-database
+
+[Install]
+WantedBy=multi-user.target
