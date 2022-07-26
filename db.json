@@ -1,8 +1,40 @@
 {
   "products": [
     {
-      "id": 1,
-      "title": "teste"
+        "id": 1,
+        "product": "TV + Net + Voice",
+        "value": 40,
+        "updated": null
+    },
+    {
+        "id": 2,
+        "product": "TV + Net",
+        "value": 30,
+        "updated": null
+    },
+    {
+        "id": 3,
+        "product": "TV + Voice",
+        "value": 20,
+        "updated": null
+    },
+    {
+        "id": 4,
+        "product": "TV Only",
+        "value": 17.5,
+        "updated": null
+    },
+    {
+        "id": 5,
+        "product": "Net Only",
+        "value": 15,
+        "updated": null
+    },
+    {
+        "id": 6,
+        "product": "Voice Only",
+        "value": 12.5,
+        "updated": null
     }
   ],
   "profile": {
